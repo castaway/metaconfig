@@ -112,8 +112,8 @@ $define|true|[yY]*)
 	$echo "Cross-compiling..."
     croak=''
     case "$cc" in
-	*-*-gcc) # A cross-compiling gcc, probably. Only supporting gcc at the moment.
-	    targetarch=`$echo $cc|$sed 's/-gcc$//'`
+	*-*-gcc|*-*-g++) # A cross-compiling gcc, probably. Only supporting gcc at the moment.
+	    targetarch=`$echo $cc|$sed 's/-g..$//'`
         $echo "Your targetarch is now set to: $targetarch"
 	    ar=$targetarch-ar
 	    # leave out ld, choosing it is more complex
@@ -197,6 +197,7 @@ $define|true|[yY]*)
 esac
 
 : Define -Dtargethost to run compiled tests on another machine
+: We are keeping targethost etc around in config.sh, thus they make it into %Config, not sure yet if this is clever.
 case "$targethost" in
     '') echo "Checking for cross-compile" >&4
     case "$usecrosscompile$multiarch" in

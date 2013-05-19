@@ -19,11 +19,17 @@
 ?X:
 ?X:	This unit computes the shared-object / shared-lib extension
 ?X:
-?MAKE:so: test Loc Myread Oldconfig cat libsearchpth
+?MAKE:so d_libname_unique: test Loc Myread Oldconfig cat libsearchpth
 ?MAKE:	-pick add $@ %<
 ?S:so:
 ?S:	This variable holds the extension used to identify shared libraries
 ?S:	(also known as shared objects) on the system. Usually set to 'so'.
+?S:.
+?S:d_libname_unique:
+?S: This variable is defined if the target system insists on unique basenames
+?S: for shared library files. This is currently true on Android, false everywhere
+?S: else we know of.
+?S: Defaults to 'undef'.
 ?S:.
 ?T: xxx
 : compute shared library extension
@@ -47,4 +53,23 @@ EOM
 rp='What is the file extension used for shared libraries?'
 . ./myread
 so="$ans"
+
+: Does target system insist that shared library basenames are unique
+$cat << EOM
+
+Some crazy dynamic loaders assume that the *basename* of shared library filenames
+are globally unique. (Hello Android!) We'll default this to undef as we assume
+your system is not this crazy. Set to defined if you're on one of them.
+
+EOM
+
+dflt='n'
+rp='Make shared library basenames unique?'
+. ./myread
+case "$ans" in
+y|Y)    val="$define" ;;
+*)      val="$undef"  ;;
+esac
+set d_libname_unique
+eval $setvar
 

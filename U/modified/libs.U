@@ -33,7 +33,7 @@
 ?RCS: Baseline for dist 3.0 netwide release.
 ?RCS:
 ?MAKE:libs ignore_versioned_solibs libsfound libsfiles libsdirs libspath: \
-	test cat Myread Oldconfig Loc libpth package xlibpth so _a \
+	test cat Myread Oldconfig Loc libsearchpth package xlibpth so _a \
 	usesocks sed uselongdouble
 ?MAKE:	-pick add $@ %<
 ?S:libs:
@@ -110,7 +110,7 @@ libsfound=''
 libsfiles=''
 libsdirs=''
 libspath=''
-for thisdir in $libpth $xlibpth; do
+for thisdir in $libsearchpth $xlibpth; do
   test -d $thisdir && libspath="$libspath $thisdir"
 done
 for thislib in $libswanted; do

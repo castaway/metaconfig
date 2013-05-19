@@ -23,7 +23,7 @@
 ?X:	    Andy Dougherty  July 1998
 ?X:
 ?MAKE:randfunc drand01 seedfunc randbits randseedtype: \
-	cat rm_try test i_stdlib i_unistd Compile Myread Csym ccflags
+	cat rm_try test i_stdlib i_unistd Compile Myread Csym ccflags run
 ?MAKE:	-pick add $@ %<
 ?S:randfunc:
 ?S:	Indicates the name of the random number function to use.
@@ -176,7 +176,7 @@ int main()
 EOCP
 				set try
 				if eval $compile_ok; then
-					dflt=`try`
+					dflt=`$run try`
 				else
 					dflt='?'
 					echo "(I can't seem to compile the test program...)"

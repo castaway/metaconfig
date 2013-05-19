@@ -13,7 +13,7 @@
 ?RCS: Revision 3.0.1.1  1997/02/28  16:20:13  ram
 ?RCS: patch61: created
 ?RCS:
-?MAKE:sh: Head
+?MAKE:sh targetsh: Head
 ?MAKE:	-pick wipe $@ %<
 ?S:sh:
 ?S:	This variable contains the full pathname of the shell used
@@ -25,6 +25,15 @@
 ?S:	option, though you can override this (and startsh)
 ?S:	with -O -Dsh=/bin/whatever -Dstartsh=whatever
 ?S:.
+?S:targetsh:
+?S: This variable contains the full pathname of the shell used
+?S: on the target system, to execute Bourne shell scripts. This may
+?S: differ from the shell used to run Configure, especially when
+?S: cross-compiling. It defaults to the sh used to run Configure.
+?S: This unit comes before Options.U, so you can't set sh with a -D
+?S: option, though you can override this (and startsh)
+?S: with -O -Dsh=/bin/whatever -Dstartsh=whatever
+?S:.
 ?C:SH_PATH:
 ?C:	This symbol contains the full pathname to the shell used on this
 ?C:	on this system to execute Bourne shell scripts.  Usually, this will be
@@ -32,7 +41,7 @@
 ?C:	/bin/pdksh, /bin/ash, /bin/bash, or even something such as
 ?C:	D:/bin/sh.exe.
 ?C:.
-?H:#define SH_PATH "$sh"  /**/
+?H:#define SH_PATH "$targetsh"  /**/
 ?H:.
 ?T:xxx try pth p SYSTYPE
 ?LINT:extern maintloc maintname _exe
@@ -89,4 +98,8 @@ EOM
 	exit 1
 	;;
 esac
+
+: When cross-compiling we need to separate the sh-to-run-Configure-with from the sh-to-use-in-Perl
+: default both to the same thing, cross-compilers can then set targetsh differently if they like
+targetsh=$sh
 

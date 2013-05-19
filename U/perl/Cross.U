@@ -5,8 +5,8 @@
 ?RCS: You may distribute under the terms of either the GNU General Public
 ?RCS: License or the Artistic License, as specified in the README file.
 ?RCS:
-?MAKE:run to from targetarch usecrosscompile: src awk grep test rm \
-	echo sed mkdir cp touch chmod
+?MAKE:run to from targetmkdir targetarch targethost targetport targetdir usecrosscompile hostperl hostgenerate: src awk grep test rm \
+	echo sed mkdir cp chmod sysroot make
 ?MAKE:	-pick add $@ %<
 ?Y:TOP
 ?S:usecrosscompile:
@@ -31,9 +31,37 @@
 ?S:	only during Perl build.
 ?S:	The string ':' if not cross-compiling.
 ?S:.
+?S:targetmkdir:
+?S: This variable contains the command used by Configure
+?S: to create a new directory on the target host.
+?S:.
+?S:targetdir:
+?S: This variable contains a path that will be created on the target host
+?S: using targetmkdir, and then used to copy the cross-compiled executables
+?S: to. Defaults to '/tmp' if not set.
+?S:.
 ?S:targetarch:
 ?S:	If cross-compiling, this variable contains the target architecture.
 ?S:	If not, this will be empty.
+?S:.
+?S:targethost:
+?S: This variable contains the name of a separate host machine that
+?S: can be used to run compiled test programs and perl tests on.
+?S: Set to empty string if not in use.
+?S:.
+?S:targetport:
+?S: This variable contains the number of a network port to be used to connect
+?S: to the host in targethost, if unset defaults to 22 for ssh.
+?S:.
+?S:hostperl:
+?S: If cross-compiling, this variable contains the path to a perl
+?S: which will run on the host. If unset a host/miniperl will be compiled
+?S: and used.
+?S:.
+?S:hostgenerate:
+?S: If cross-compiling, this variable contains the path to a 'generate_uudmap'
+?S: binary that runs on the host. It will be set to host/generate_uudmap which
+?S: will be compiled.
 ?S:.
 ?C:USE_CROSS_COMPILE:
 ?C:	This symbol, if defined, indicates that Perl is being cross-compiled.
@@ -56,6 +84,7 @@
 ?LINT:change nm
 ?LINT:change ranlib
 ?LINT:extern targethost
+?LINT:extern targetport
 ?LINT:extern targetdir
 ?LINT:change targetdir
 ?LINT:extern targetuser
@@ -67,7 +96,6 @@
 ?LINT:change targetrun
 ?LINT:change targetfrom
 ?LINT:change targetto
-?LINT:change targetmkdir
 ?LINT:extern incpth
 ?LINT:extern libpth
 ?LINT:change incpth
@@ -76,114 +104,166 @@
 ?LINT:extern loclibpth
 ?LINT:change locincpth
 ?LINT:change loclibpth
+?LINT:extern hostperl
+?LINT:extern hostgenerate
 : Check for Cross-Compilation
 case "$usecrosscompile" in
 $define|true|[yY]*)
 	$echo "Cross-compiling..."
-        croak=''
-    	case "$cc" in
-	*-*-gcc) # A cross-compiling gcc, probably.
+    croak=''
+    case "$cc" in
+	*-*-gcc) # A cross-compiling gcc, probably. Only supporting gcc at the moment.
 	    targetarch=`$echo $cc|$sed 's/-gcc$//'`
+        $echo "Your targetarch is now set to: $targetarch"
 	    ar=$targetarch-ar
 	    # leave out ld, choosing it is more complex
 	    nm=$targetarch-nm
 	    ranlib=$targetarch-ranlib
-	    $echo 'extern int foo;' > try.c
-	    set X `$cc -v -E try.c 2>&1 | $awk '/^#include </,/^End of search /'|$grep '/include'`
-	    shift
+        # if sysroot is set we already have our incpath and libpath discovered, else try to get gcc to tell us
+	    if test "X$sysroot" = X; then
+	        $echo 'extern int foo;' > try.c
+	        set X `$cc -v -E try.c 2>&1 | $awk '/^#include </,/^End of search /'|$grep '/include'`
+	        shift
             if $test $# -gt 0; then
-	        incpth="$incpth $*"
-		incpth="`$echo $incpth|$sed 's/^ //'`"
+	            incpth="$incpth $*"
+		        incpth="`$echo $incpth|$sed 's/^ //'`"
                 echo "Guessing incpth '$incpth'." >&4
                 for i in $*; do
-		    j="`$echo $i|$sed 's,/include$,/lib,'`"
-		    if $test -d $j; then
-			libpth="$libpth $j"
-		    fi
+		            j="`$echo $i|$sed 's,/include$,/lib,'`"
+ 		            if $test -d $j; then
+			            libpth="$libpth $j"
+		            fi
                 done   
-		libpth="`$echo $libpth|$sed 's/^ //'`"
+		        libpth="`$echo $libpth|$sed 's/^ //'`"
                 echo "Guessing libpth '$libpth'." >&4
-	    fi
-	    $rm -f try.c
-	    ;;
+	        fi
+	        $rm -f try.c
+        fi
+        ;;
 	esac
 	case "$targetarch" in
 	'') echo "Targetarch not defined." >&4; croak=y ;;
         *)  echo "Using targetarch $targetarch." >&4 ;;
 	esac
-	case "$incpth" in
-	'') echo "Incpth not defined." >&4; croak=y ;;
-        *)  echo "Using incpth '$incpth'." >&4 ;;
-	esac
-	case "$libpth" in
-	'') echo "Libpth not defined." >&4; croak=y ;;
-        *)  echo "Using libpth '$libpth'." >&4 ;;
-	esac
-	case "$usrinc" in
-	'') for i in $incpth; do
-	        if $test -f $i/errno.h -a -f $i/stdio.h -a -f $i/time.h; then
-		    usrinc=$i
-	            echo "Guessing usrinc $usrinc." >&4
-		    break
-		fi
-	    done
-	    case "$usrinc" in
-	    '') echo "Usrinc not defined." >&4; croak=y ;;
+    if test "X$sysroot" = X; then
+	    case "$incpth" in
+	        '') echo "Incpth not defined." >&4; croak=y ;;
+            *)  echo "Using incpth '$incpth'." >&4 ;;
 	    esac
-            ;;
-        *)  echo "Using usrinc $usrinc." >&4 ;;
-	esac
-	case "$targethost" in
-	'') echo "Targethost not defined." >&4; croak=y ;;
-        *)  echo "Using targethost $targethost." >&4
-	esac
-	locincpth=' '
-	loclibpth=' '
-	case "$croak" in
-	y) echo "Cannot continue, aborting." >&4; exit 1 ;;
-	esac
-	case "$src" in
-	/*) run=$src/Cross/run
-	    targetmkdir=$src/Cross/mkdir
-	    to=$src/Cross/to
-	    from=$src/Cross/from
-	    ;;
-	*)  pwd=`$test -f ../Configure & cd ..; pwd`
-	    run=$pwd/Cross/run
-	    targetmkdir=$pwd/Cross/mkdir
-	    to=$pwd/Cross/to
-	    from=$pwd/Cross/from
-	    ;;
-	esac
-	case "$targetrun" in
-	'') targetrun=ssh ;;
-	esac
-	case "$targetto" in
-	'') targetto=scp ;;
-	esac
-	case "$targetfrom" in
-	'') targetfrom=scp ;;
-	esac
-    	run=$run-$targetrun
-    	to=$to-$targetto
-    	from=$from-$targetfrom
-	case "$targetdir" in
-	'')  targetdir=/tmp
-             echo "Guessing targetdir $targetdir." >&4
-             ;;
-	esac
-	case "$targetuser" in
-	'')  targetuser=root
-             echo "Guessing targetuser $targetuser." >&4
-             ;;
-	esac
-	case "$targetfrom" in
-	scp)	q=-q ;;
-	*)	q='' ;;
-	esac
-	case "$targetrun" in
-	ssh|rsh)
-	    cat >$run <<EOF
+	    case "$libpth" in
+	        '') echo "Libpth not defined." >&4; croak=y ;;
+            *)  echo "Using libpth '$libpth'." >&4 ;;
+	    esac
+	    case "$usrinc" in
+	        '') for i in $incpth; do
+	            if $test -f $i/errno.h -a -f $i/stdio.h -a -f $i/time.h; then
+		            usrinc=$i
+	                echo "Guessing usrinc $usrinc." >&4
+		            break
+		        fi
+	            done
+	            case "$usrinc" in
+	                '') echo "Usrinc not defined." >&4; croak=y ;;
+	            esac
+                ;;
+            *)  echo "Using usrinc $usrinc." >&4 ;;
+	    esac
+	    case "$croak" in
+	        y) echo "Cannot continue, aborting." >&4; exit 1 ;;
+	    esac
+        locincpth=' '
+        loclibpth=' '
+    else
+        echo "Cross-compiling using sysroot $sysroot, guessing of GCC inc/lib paths skipped" >&4
+    fi
+    : compile a host miniperl and generate_uudmap, unless we got passed them
+    if $test "X$hostperl" = X; then
+      echo "Building host miniperl and generate_uudmap binaries" >&4
+      cd ..
+      test -d host || mkdir host
+      cd host && rm -rf ./*
+      ../Configure -des -Dusedevel -Dmksymlinks
+      make miniperl
+      make generate_uudmap
+      hostperl=host/miniperl
+      hostgenerate=host/generate_uudmap
+      cd ..
+      cd UU
+    fi
+    ;;
+*)
+    usecrosscompile='undef'
+    ;;
+esac
+
+: Define -Dtargethost to run compiled tests on another machine
+case "$targethost" in
+    '') echo "Checking for cross-compile" >&4
+    case "$usecrosscompile$multiarch" in
+       *$define*) echo "Skipping the try tests in the rest of Configure as no targethost was defined when cross-compiling" >&4
+         if [ -f Makefile ]; then
+           echo " "
+           echo "Now you must ensure config.sh, config.h and the generated headers exist and run a $make."
+         else
+           echo "Configure done."
+         fi
+       exit 0
+       ;;
+     *) echo "No targethost for running compiler tests against defined, running locally" >&4
+        run=''
+        to=:
+        from=:
+        ;;
+    esac
+    ;;
+    *) echo "Using targethost $targethost." >&4
+       case "$src" in
+	       /*) run=$src/Cross/run
+	           targetmkdir=$src/Cross/mkdir
+	           to=$src/Cross/to
+	           from=$src/Cross/from
+	           ;;
+	       *)  pwd=`$test -f ../Configure && cd ..; pwd`
+	           run=$pwd/Cross/run
+	           targetmkdir=$pwd/Cross/mkdir
+	           to=$pwd/Cross/to
+	           from=$pwd/Cross/from
+	           ;;
+	   esac
+	   case "$targetrun" in
+	       '') targetrun=ssh ;;
+	   esac
+	   case "$targetto" in
+	       '') targetto=scp ;;
+	   esac
+	   case "$targetfrom" in
+	       '') targetfrom=scp ;;
+	   esac
+       run=$run-$targetrun
+       to=$to-$targetto
+       from=$from-$targetfrom
+	   case "$targetdir" in
+	       '')  targetdir=/tmp
+               echo "Guessing targetdir $targetdir." >&4
+               ;;
+	   esac
+	   case "$targetuser" in
+	       '')  targetuser=root
+               echo "Guessing targetuser $targetuser." >&4
+               ;;
+	   esac
+	   case "$targetport" in
+	       '')  targetport=22
+               echo "Guessing targetport $targetport." >&4
+               ;;
+	   esac
+	   case "$targetfrom" in
+	       scp)	q=-q ;;
+	       *)	q='' ;;
+	   esac
+	   case "$targetrun" in
+	       ssh|rsh)
+	           cat >$run <<EOF
 #!/bin/sh
 case "\$1" in
 -cwd)
@@ -197,50 +277,47 @@ case "\$cwd" in
 esac
 exe=\$1
 shift
-if $test ! -f \$exe.xok; then
-  $to \$exe
-  $touch \$exe.xok
-fi
-$targetrun -l $targetuser $targethost "cd \$cwd && ./\$exe \$@"
+$to \$exe
+$targetrun -p $targetport -l $targetuser $targethost "cd \$cwd && ./\$exe \$@"
 EOF
 	    ;;
-	*)  echo "Unknown targetrun '$targetrun'" >&4
-	    exit 1
-	    ;;
-	esac
-	case "$targetmkdir" in
-	*/Cross/mkdir)
+	       *)  echo "Unknown targetrun '$targetrun'" >&4
+	           exit 1
+	           ;;
+	   esac
+	   case "$targetmkdir" in
+	       */Cross/mkdir)
 	    cat >$targetmkdir <<EOF
 #!/bin/sh
-$targetrun -l $targetuser $targethost "mkdir -p \$@"
+$targetrun -p $targetport -l $targetuser $targethost "mkdir -p \$@"
 EOF
 	    $chmod a+rx $targetmkdir
 	    ;;
-	*)  echo "Unknown targetmkdir '$targetmkdir'" >&4
-	    exit 1
-	    ;;
-	esac
-	case "$targetto" in
-	scp|rcp)
-	    cat >$to <<EOF
+	       *)  echo "Unknown targetmkdir '$targetmkdir'" >&4
+	           exit 1
+	           ;;
+	   esac
+	   case "$targetto" in
+	       scp|rcp)
+	           cat >$to <<EOF
 #!/bin/sh
 for f in \$@
 do
   case "\$f" in
   /*)
     $targetmkdir \`dirname \$f\`
-    $targetto $q \$f $targetuser@$targethost:\$f            || exit 1
+    $targetto -P $targetport $q \$f $targetuser@$targethost:\$f            || exit 1
     ;;
   *)
     $targetmkdir $targetdir/\`dirname \$f\`
-    $targetto $q \$f $targetuser@$targethost:$targetdir/\$f || exit 1
+    $targetto -P $targetport $q \$f $targetuser@$targethost:$targetdir/\$f || exit 1
     ;;
   esac
 done
 exit 0
 EOF
-	    ;;
-	cp) cat >$to <<EOF
+	           ;;
+	       cp) cat >$to <<EOF
 #!/bin/sh
 for f in \$@
 do
@@ -257,24 +334,24 @@ do
 done
 exit 0
 EOF
-	    ;;
-	*)  echo "Unknown targetto '$targetto'" >&4
-	    exit 1
-	    ;;
-	esac
-	case "$targetfrom" in
-	scp|rcp)
-	  cat >$from <<EOF
+	           ;;
+	       *)  echo "Unknown targetto '$targetto'" >&4
+	           exit 1
+	           ;;
+	   esac
+	   case "$targetfrom" in
+	       scp|rcp)
+	           cat >$from <<EOF
 #!/bin/sh
 for f in \$@
 do
   $rm -f \$f
-  $targetfrom $q $targetuser@$targethost:$targetdir/\$f . || exit 1
+  $targetfrom -P $targetport $q $targetuser@$targethost:$targetdir/\$f . || exit 1
 done
 exit 0
 EOF
-	    ;;
-	cp) cat >$from <<EOF
+	           ;;
+	       cp) cat >$from <<EOF
 #!/bin/sh
 for f in \$@
 do
@@ -283,40 +360,34 @@ do
 done
 exit 0
 EOF
-	    ;;
-	*)  echo "Unknown targetfrom '$targetfrom'" >&4
-	    exit 1
-	    ;;
-	esac
-	if $test ! -f $run; then
-	    echo "Target 'run' script '$run' not found." >&4
-	else
-	    $chmod a+rx $run
-	fi
-	if $test ! -f $to; then
-	    echo "Target 'to' script '$to' not found." >&4
-	else
-	    $chmod a+rx $to
-	fi
-	if $test ! -f $from; then
-	    echo "Target 'from' script '$from' not found." >&4
-	else
-	    $chmod a+rx $from
-	fi
-	if $test ! -f $run -o ! -f $to -o ! -f $from; then
-	    exit 1
-	fi
-	cat >&4 <<EOF
+	           ;;
+	       *)  echo "Unknown targetfrom '$targetfrom'" >&4
+	           exit 1
+	           ;;
+	   esac
+	   if $test ! -f $run; then
+	       echo "Target 'run' script '$run' not found." >&4
+	   else
+	       $chmod a+rx $run
+	   fi
+	   if $test ! -f $to; then
+	       echo "Target 'to' script '$to' not found." >&4
+	   else
+	       $chmod a+rx $to
+	   fi
+	   if $test ! -f $from; then
+	       echo "Target 'from' script '$from' not found." >&4
+	   else
+	       $chmod a+rx $from
+	   fi
+	   if $test ! -f $run -o ! -f $to -o ! -f $from; then
+	       exit 1
+	   fi
+	   cat >&4 <<EOF
 Using '$run' for remote execution,
 and '$from' and '$to'
 for remote file transfer.
 EOF
-	;;
-*)	run=''
-	to=:
-	from=:
-	usecrosscompile='undef'
-	targetarch=''
-	;;
-esac
+	   ;;
+esac # if targethost
 

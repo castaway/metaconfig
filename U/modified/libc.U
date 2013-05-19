@@ -49,7 +49,7 @@
 ?RCS: Baseline for dist 3.0 netwide release.
 ?RCS:
 ?MAKE:libc +nm_extract: echo n c rm test grep Getfile Myread Oldconfig Loc \
-	sed libs incpath libpth ar runnm nm nm_opt nm_so_opt contains xlibpth \
+	sed libs incpath libsearchpth ar runnm nm nm_opt nm_so_opt contains xlibpth \
 	so _a _o osname trnl tr sort uniq
 ?MAKE:	-pick add $@ %<
 ?S:libc:
@@ -88,17 +88,17 @@ case "$libs" in
 		;;
 	-l*)
 		thislib=`echo $thislib | $sed -e 's/^-l//'`
-		if try=`./loc lib$thislib.$so.'*' X $libpth`; $test -f "$try"; then
+		if try=`./loc lib$thislib.$so.'*' X $libsearchpth`; $test -f "$try"; then
 			:
-		elif try=`./loc lib$thislib.$so X $libpth`; $test -f "$try"; then
+		elif try=`./loc lib$thislib.$so X $libsearchpth`; $test -f "$try"; then
 			:
-		elif try=`./loc lib$thislib$_a X $libpth`; $test -f "$try"; then
+		elif try=`./loc lib$thislib$_a X $libsearchpth`; $test -f "$try"; then
 			:
-		elif try=`./loc $thislib$_a X $libpth`; $test -f "$try"; then
+		elif try=`./loc $thislib$_a X $libsearchpth`; $test -f "$try"; then
 			:
-		elif try=`./loc lib$thislib X $libpth`; $test -f "$try"; then
+		elif try=`./loc lib$thislib X $libsearchpth`; $test -f "$try"; then
 			:
-		elif try=`./loc $thislib X $libpth`; $test -f "$try"; then
+		elif try=`./loc $thislib X $libsearchpth`; $test -f "$try"; then
 			:
 		elif try=`./loc Slib$thislib$_a X $xlibpth`; $test -f "$try"; then
 			:
@@ -135,7 +135,7 @@ unknown)
 ?X: empty string, causing Configure to output all its set variables!
 ?X:
 	set /lib/libc.$so
-	for xxx in $libpth; do
+	for xxx in $libsearchpth; do
 		$test -r $1 || set $xxx/libc.$so
 		: The messy sed command sorts on library version numbers.
 		$test -r $1 || \
@@ -183,11 +183,11 @@ elif $test -r /lib/libc$_a; then
 	libc=/lib/libc$_a;
 	echo "Your C library seems to be in $libc.  You're normal."
 else
-	if tans=`./loc libc$_a blurfl/dyick $libpth`; $test -r "$tans"; then
+	if tans=`./loc libc$_a blurfl/dyick $libsearchpth`; $test -r "$tans"; then
 		:
-	elif tans=`./loc libc blurfl/dyick $libpth`; $test -r "$tans"; then
-		libnames="$libnames "`./loc clib blurfl/dyick $libpth`
-	elif tans=`./loc clib blurfl/dyick $libpth`; $test -r "$tans"; then
+	elif tans=`./loc libc blurfl/dyick $libsearchpth`; $test -r "$tans"; then
+		libnames="$libnames "`./loc clib blurfl/dyick $libsearchpth`
+	elif tans=`./loc clib blurfl/dyick $libsearchpth`; $test -r "$tans"; then
 		:
 	elif tans=`./loc Slibc$_a blurfl/dyick $xlibpth`; $test -r "$tans"; then
 		:
@@ -213,7 +213,7 @@ compiler, or your machine supports multiple models), you can override it here.
 EOM
 else
 	dflt=''
-	echo $libpth | $tr ' ' $trnl | $sort | $uniq > libpath
+	echo $libsearchpth | $tr ' ' $trnl | $sort | $uniq > libpath
 	cat >&4 <<EOM
 I can't seem to find your C library.  I've looked in the following places:
 

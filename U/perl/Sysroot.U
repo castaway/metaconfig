@@ -1,0 +1,40 @@
+?RCS: $Id$
+?RCS:
+?RCS: You may distribute under the terms of either the GNU General Public
+?RCS: License or the Artistic License, as specified in the README file.
+?RCS:
+?MAKE:sysroot: test echo Head
+?MAKE:	-pick add $@ %<
+?Y:TOP
+?S:sysroot:
+?S: This variable is empty unless supplied by the Configure user.
+?S: It can contain a path to an alternative root directory, under which
+?S: headers and libraries for the compilation target can be found. This
+?S: is generally used when cross-compiling using a gcc-like compiler.
+?S:.
+?LINT:extern sysroot
+?LINT:change ccflags
+?LINT:change ldflags
+?LINT:change cccdlflags
+: Set 'sysroot' to change the logical root directory to your headers and libraries see man gcc
+: This is primarily meant for cross-compile environments, and may fail to be useful in other cases
+if $test "X$sysroot" != X; then
+  $echo "Using $sysroot to find your headers and libraries, adding to ccflags"
+  case "$ccflags" in
+  *sysroot*) ;;
+  'undef'|*)
+       ccflags="$ccflags --sysroot=$sysroot"
+  esac
+  case "$ldflags" in
+  *sysroot*) ;;
+  'undef'|*)
+       ldflags="$ldflags --sysroot=$sysroot"
+  esac
+  case "$cccdlflags" in
+  *sysroot*) ;;
+  'undef'|*)
+       cccdlflags="$cccdlflags --sysroot=$sysroot"
+  esac
+  # lddlflags updated below in lddlflags section
+fi
+

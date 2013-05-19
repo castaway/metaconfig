@@ -34,12 +34,18 @@
 ?X:
 ?X:	This unit initializes the path for C library lookup.
 ?X:
-?MAKE:libpth glibpth xlibpth plibpth loclibpth: \
-	usrinc incpath test cat Myread Oldconfig
+?MAKE:libpth libsearchpth glibpth xlibpth plibpth loclibpth: \
+	usrinc incpath test cat Myread Oldconfig sysroot
 ?MAKE:	-pick add $@ %<
 ?S:libpth:
 ?S:	This variable holds the general path (space-separated) used to find
 ?S:	libraries. It is intended to be used by other units.
+?S:.
+?S:libsearchpth:
+?S: This variable holds the paths to the actual lib files on disk, this
+?S: differs from libpath when we are using sysroot (and probably cross-
+?S: compiling). libpth will be the values for the gcc -L argument, libsearchpth
+?S: will be the actual files.
 ?S:.
 ?S:glibpth:
 ?S:	This variable holds the general path (space-separated) used to
@@ -97,14 +103,21 @@ case "$libpth" in
 esac
 
 : Now check and see which directories actually exist, avoiding duplicates
+: Use sysroot for checking so we find cross-compiler dirs
 libpth=''
+: create list of actual paths on disk, for lib hunting later
+libsearchpth=''
 for xxx in $dlist
 do
-    if $test -d $xxx; then
+    if $test -d $sysroot$xxx; then
 		case " $libpth " in
 		*" $xxx "*) ;;
 		*) libpth="$libpth $xxx";;
 		esac
+        case " $libsearchpth " in
+		*" $sysroot$xxx "*) ;;
+		*) libsearchpth="$libsearchpth $sysroot$xxx";;
+		esac            
     fi
 done
 $cat <<'EOM'
@@ -115,6 +128,12 @@ know not to be holding relevant libraries, and add any that are needed.
 Say "none" for none.
 
 EOM
+if test "X$sysroot" != X; then
+  $cat <<EOM
+You have set sysroot to $sysroot, please supply the directories excluding sysroot
+
+EOM
+fi
 case "$libpth" in
 '') dflt='none';;
 *)
@@ -130,4 +149,13 @@ case "$ans" in
 none) libpth=' ';;
 *) libpth="$ans";;
 esac
+: reset libsearchpth, listing each path with sysroot included, removing any duplicates
+libsearchpth=''
+for xxx in $libpth
+do
+    case " $libsearchpth " in
+    *" $sysroot$xxx "*) ;;
+    *) libsearchpth="$libsearchpth $sysroot$xxx";;
+    esac
+done
 

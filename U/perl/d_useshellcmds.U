@@ -1,0 +1,43 @@
+?RCS: $id$
+?RCS:
+?RCS: You may redistribute only under the terms of the Artistic Licence,
+?RCS: as specified in the README file that comes with the distribution.
+?RCS: You may reuse parts of this distribution only within the terms of
+?RCS: that same Artistic Licence; a copy of which may be found at the root
+?RCS: of the source tree for dist 3.0.
+?RCS:
+?MAKE:d_useshellcmds:Myread Oldconfig Setvar cat
+?MAKE:	-pick add $@ %<
+?S:d_useshellcmds:
+?S: This variable is defined if the target OS does not include standalone
+?S: binaries such as "echo" and "test" that replicate shell commands. If set
+?S: Perl always runs the shell variants using sh -c.
+?S: The default is ''.
+?S:.
+?C:USE_SHELL_ALWAYS:
+?C: This symbol, if defined, indicates that only shell commands should be used
+?C: when using system() or backticks.
+?C:.
+?H:#$d_useshellcmds USE_SHELL_ALWAYS		/**/
+?H:.
+?LINT:set d_useshellcmds
+: determine whether target system wants us to only use shell commands for echo, test etc.
+$cat << EOM
+
+By default, Perl will only create a shell subprocess for system(), backticks etc, if you
+use shell metacharacters in your shell command. Some operating systems (eg Android) do not
+install the separate echo and test binaries, so we can force it to always spawn a shell using
+this variable. Set this to 'y' to always create a shell subprocess.
+
+EOM
+
+dflt='n'
+rp='Always use a shell subprocess?'
+. ./myread
+case "$ans" in
+y|Y)    val="$define" ;;
+*)      val="$undef"  ;;
+esac
+set d_useshellcmds
+eval $setvar
+

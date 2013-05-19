@@ -19,7 +19,7 @@
 ?MAKE:usedl ld dlsrc cccdlflags lddlflags ccdlflags bin_ELF ld_can_script: \
 	rm_try Getfile Myread test osname sed i_dld d_dlopen Findhdr Setvar \
 	src run cc ccflags ldflags optimize ls gccversion cat rsrc i_stdlib \
-	i_unistd osvers
+	i_unistd osvers sysroot
 ?MAKE:	-pick add $@ %<
 ?Y:BOTTOM
 ?S:usedl:
@@ -149,7 +149,7 @@ EOM
 			;;
 		*)  case "$osname" in
 	                darwin) dflt='none' ;;
-			linux*|svr4*|esix*|solaris|nonstopux) dflt='-fPIC' ;;
+			*linux*|svr4*|esix*|solaris|nonstopux) dflt='-fPIC' ;;
 			*)	dflt='-fpic' ;;
 		    esac ;;
 	    esac ;;
@@ -235,7 +235,7 @@ EOM
 			      '') dflt="$dflt +vnocompatwarnings" ;;
 			      esac
 			      ;;
-			linux|irix*|gnu*)  dflt="-shared $optimize" ;;
+			*linux*|irix*|gnu*)  dflt="-shared $optimize" ;;
 			next)  dflt='none' ;;
 			solaris) # See [perl #66604].
 				# On Solaris 11, gcc -m64 on amd64 
@@ -259,6 +259,11 @@ EOM
 			;;
     *) dflt="$lddlflags" ;;
     esac
+
+    : Should we only do this if its gcc/linux? 
+    if $test "X$sysroot" != X; then
+        dflt="$dflt --sysroot $sysroot"
+    fi
 
 	: Try to guess additional flags to pick up local libraries.
 	: Be careful not to append to a plain 'none'
@@ -307,7 +312,7 @@ say "none".
 EOM
     case "$ccdlflags" in
     '') case "$osname" in
-	    linux|hpux|gnu*)	dflt='-Wl,-E' ;;
+	    *linux*|hpux|gnu*)	dflt='-Wl,-E' ;;
 	    next|sunos)	dflt='none' ;;
 	    *)		dflt='none' ;;
 	    esac ;;
